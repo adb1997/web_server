@@ -1,14 +1,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-int main(void)
- {
- printf("Content-type: text/html\n\n");
- printf("<html><title>Hello</title><body>\n");
- printf("Goodbye Cruel World\n");
- printf("</body></html>");
 
- fflush(stdout);
- 
- exit(0);
+void goodbye(){
+
+    printf("Content-type: text/html\n\n");
+    printf("<html><title>Hello</title><body>\n");
+    printf("Goodbye Cruel World NEWWWWWW\n");
+    printf("</body></html>");
+
+    fflush(stdout);
+    // exit(0);
  }

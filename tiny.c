@@ -24,6 +24,8 @@
 #include <netdb.h>
 
 #include <pthread.h>
+#include <dlfcn.h>
+
 
 #define HOSTLEN 256
 #define SERVLEN 8
@@ -189,18 +191,19 @@ void serve_static(int fd, char *filename, int filesize) {
     }
 }
 
-/*
- * serve_dynamic - run a CGI program on behalf of the client
- */
+
 void serve_dynamic(int fd, char *filename, char *cgiargs) {
+    
     char buf[MAXLINE];
     size_t buflen;
-    char *emptylist[] = { NULL };
+    //char *emptylist[] = { NULL };
+    // cgiargs = NULL;
+    // filename = NULL;
 
     /* Format first part of HTTP response */
     buflen = snprintf(buf, MAXLINE,
             "HTTP/1.0 200 OK\r\n" \
-            "Server: Tiny Web Server\r\n");
+            "Server: Tiny Web Server-IN THE NEW DYNAMIC\r\n");
     if (buflen >= MAXLINE) {
         return; // Overflow!
     }
@@ -211,32 +214,98 @@ void serve_dynamic(int fd, char *filename, char *cgiargs) {
         return;
     }
 
-    pid_t pid = fork();
-    if (pid == 0) { /* Child */
-        /* Real server would set all CGI vars here */
-        setenv("QUERY_STRING", cgiargs, 1);
 
-        /* Redirect stdout to client */
-        dup2(fd, STDOUT_FILENO);
-        close(fd);
+    printf("Response headers:\n%s", buf);
 
-        /* Run CGI program */
-        if (execve(filename, emptylist, environ) < 0) {
-            perror(filename);
-            exit(1);  /* Exit child process */
-        }
-    }
-    else if (pid == -1) {
-        perror("fork");
+    if (rio_writen(fd, buf, buflen) < 0) {
+        fprintf(stderr, "Error writing static response headers to client\n");
         return;
     }
 
-    /* Parent waits for and reaps child */
-    if (wait(NULL) < 0) {
-        perror("wait");
+    printf("REACHED HERE ~~\n");
+    printf("Filename: %s\n",filename);
+    printf("Args: %s\n", cgiargs);
+
+
+    int temp = dup(1);
+    dup2(fd, 1);
+
+    void *handle;
+    void (*func)(char *);
+    char *error;
+
+    handle = dlopen("cgi-bin/libvector.so", RTLD_NOW);
+    if (!handle){
+        perror("Dlopen");
         return;
     }
+     
+    func = dlsym(handle, "adder");
+    if ((error = dlerror()) != NULL){
+        perror("goodbye error");
+        return;
+    }
+    
+
+    func(cgiargs);
+
+    // if (dlclose(handle) < 0){
+    //     perror("dlclose");
+    //     return;
+    // }
+    close(fd);
+    dup2(temp, 1);
+    printf("Done\n");
 }
+
+/*
+ * serve_dynamic - run a CGI program on behalf of the client
+ */
+// void serve_dynamic(int fd, char *filename, char *cgiargs) {
+//     char buf[MAXLINE];
+//     size_t buflen;
+//     char *emptylist[] = { NULL };
+
+//     /* Format first part of HTTP response */
+//     buflen = snprintf(buf, MAXLINE,
+//             "HTTP/1.0 200 OK\r\n" \
+//             "Server: Tiny Web Server\r\n");
+//     if (buflen >= MAXLINE) {
+//         return; // Overflow!
+//     }
+
+//     /* Write first part of HTTP response */
+//     if (rio_writen(fd, buf, buflen) < 0) {
+//         fprintf(stderr, "Error writing dynamic response headers to client\n");
+//         return;
+//     }
+
+//     pid_t pid = fork();
+//     if (pid == 0) { /* Child */
+//         /* Real server would set all CGI vars here */
+//         setenv("QUERY_STRING", cgiargs, 1);
+
+//         /* Redirect stdout to client */
+//         dup2(fd, STDOUT_FILENO);
+//         close(fd);
+
+//         /* Run CGI program */
+//         if (execve(filename, emptylist, environ) < 0) {
+//             perror(filename);
+//             exit(1);  /* Exit child process */
+//         }
+//     }
+//     else if (pid == -1) {
+//         perror("fork");
+//         return;
+//     }
+
+//     /* Parent waits for and reaps child */
+//     if (wait(NULL) < 0) {
+//         perror("wait");
+//         return;
+//     }
+// }
 
 /*
  * clienterror - returns an error message to the client
@@ -415,9 +484,10 @@ void serve(client_info *client) {
 void *thread(void *vargp){
 
     client_info *client = (client_info *)vargp;
+    printf("Created thread for conn: %s:%s", client->host, client->serv);
     pthread_detach(pthread_self());
     serve(client);
-    printf("Created thread for conn: %s:%s", client->host, client->serv);
+   
     close(client->connfd);
     free(vargp);
     return NULL;
