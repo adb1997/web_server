@@ -90,7 +90,7 @@ parse_result parse_uri(char *uri, char *filename, char *cgiargs) {
         if (snprintf(filename, MAXLINE, ".%s", uri) >= MAXLINE) {
             return PARSE_ERROR; // Overflow!
         }
-
+        // printf("parse filename: %s\n", filename);
         return PARSE_DYNAMIC;
     }
 
@@ -234,7 +234,7 @@ void serve_dynamic_dll(int fd, char *filename, char *cgiargs) {
         last = ptr; //[p]oin[t]e[r]
         ptr = strtok(NULL, delim);
     }
-    // printf("%s\n", last);
+    printf("%s\n", last);
 
     void (*func)(char *, char *);
     // void *handle;
@@ -461,27 +461,25 @@ void serve(client_info *client) {
         return;
     }
 
+
     /* Attempt to stat the file */
     struct stat sbuf;
-    if (stat(filename, &sbuf) < 0) {
-        clienterror(client->connfd, "404", "Not found",
-                    "Tiny couldn't find this file");
-        return;
-    }
+    stat(filename, &sbuf);
+
 
     if (result == PARSE_STATIC) { /* Serve static content */
-        if (!(S_ISREG(sbuf.st_mode)) || !(S_IRUSR & sbuf.st_mode)) {
-            clienterror(client->connfd, "403", "Forbidden",
-                        "Tiny couldn't read the file");
-            return;
-        }
+        // if (!(S_ISREG(sbuf.st_mode)) || !(S_IRUSR & sbuf.st_mode)) {
+        //     clienterror(client->connfd, "403", "Forbidden",
+        //                 "Tiny couldn't read the file");
+        //     return;
+        // }
         serve_static(client->connfd, filename, sbuf.st_size);
     } else { /* Serve dynamic content */
-        if (!(S_ISREG(sbuf.st_mode)) || !(S_IXUSR & sbuf.st_mode)) {
-            clienterror(client->connfd, "403", "Forbidden",
-                        "Tiny couldn't run the CGI program");
-            return;
-        }
+        // if (!(S_ISREG(sbuf.st_mode)) || !(S_IXUSR & sbuf.st_mode)) {
+        //     clienterror(client->connfd, "403", "Forbidden",
+        //                 "Tiny couldn't run the CGI program");
+        //     return;
+        // }
         serve_dynamic_dll(client->connfd, filename, cgiargs);
     }
 }
