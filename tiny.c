@@ -32,6 +32,7 @@
 
 
 void *handle;
+char delim[] = "/";
 
 /* Typedef for convenience */
 typedef struct sockaddr SA;
@@ -196,13 +197,10 @@ void serve_static(int fd, char *filename, int filesize) {
 }
 
 
-void serve_dynamic(int fd, char *filename, char *cgiargs) {
+void serve_dynamic_dll(int fd, char *filename, char *cgiargs) {
     
     char buf[MAXLINE];
     size_t buflen;
-    //char *emptylist[] = { NULL };
-    // cgiargs = NULL;
-    filename = NULL;
 
     /* Format first part of HTTP response */
     buflen = snprintf(buf, MAXLINE,
@@ -219,17 +217,25 @@ void serve_dynamic(int fd, char *filename, char *cgiargs) {
     }
 
 
-    printf("Response headers:\n%s", buf);
+    // printf("Response headers:\n%s", buf);
 
-    if (rio_writen(fd, buf, buflen) < 0) {
-        fprintf(stderr, "Error writing static response headers to client\n");
-        return;
-    }
-
-    // int temp = dup(1);
-    // dup2(fd, 1);
+    // if (rio_writen(fd, buf, buflen) < 0) {
+    //     fprintf(stderr, "Error writing static response headers to client\n");
+    //     return;
+    // }
 
     
+
+    char *ptr = strtok(filename, delim);
+    char *last;
+
+    while(ptr != NULL)
+    {
+        last = ptr; //[p]oin[t]e[r]
+        ptr = strtok(NULL, delim);
+    }
+    // printf("%s\n", last);
+
     void (*func)(char *, char *);
     // void *handle;
     char *error;
@@ -241,19 +247,13 @@ void serve_dynamic(int fd, char *filename, char *cgiargs) {
     //     return;
     // }
      
-    func = dlsym(handle, "adder");
+    func = dlsym(handle, last);
     if ((error = dlerror()) != NULL){
         perror("goodbye error");
         return;
     }
     
-
     func(cgiargs, buf2);
-
-    if (dlclose(handle) < 0){
-        perror("dlclose");
-        return;
-    }
     
     if (rio_writen(fd, buf2, sizeof(buf2)) < 0) {
         fprintf(stderr, "Error writing static response headers to client\n");
@@ -261,58 +261,56 @@ void serve_dynamic(int fd, char *filename, char *cgiargs) {
     }
 
     close(fd);
-    // dup2(temp, 1);
-    // printf("Done\n");
 }
 
 /*
  * serve_dynamic - run a CGI program on behalf of the client
  */
-// void serve_dynamic(int fd, char *filename, char *cgiargs) {
-//     char buf[MAXLINE];
-//     size_t buflen;
-//     char *emptylist[] = { NULL };
+void serve_dynamic_cgi(int fd, char *filename, char *cgiargs) {
+    char buf[MAXLINE];
+    size_t buflen;
+    char *emptylist[] = { NULL };
 
-//     /* Format first part of HTTP response */
-//     buflen = snprintf(buf, MAXLINE,
-//             "HTTP/1.0 200 OK\r\n" \
-//             "Server: Tiny Web Server\r\n");
-//     if (buflen >= MAXLINE) {
-//         return; // Overflow!
-//     }
+    /* Format first part of HTTP response */
+    buflen = snprintf(buf, MAXLINE,
+            "HTTP/1.0 200 OK\r\n" \
+            "Server: Tiny Web Server\r\n");
+    if (buflen >= MAXLINE) {
+        return; // Overflow!
+    }
 
-//     /* Write first part of HTTP response */
-//     if (rio_writen(fd, buf, buflen) < 0) {
-//         fprintf(stderr, "Error writing dynamic response headers to client\n");
-//         return;
-//     }
+    /* Write first part of HTTP response */
+    if (rio_writen(fd, buf, buflen) < 0) {
+        fprintf(stderr, "Error writing dynamic response headers to client\n");
+        return;
+    }
 
-//     pid_t pid = fork();
-//     if (pid == 0) { /* Child */
-//         /* Real server would set all CGI vars here */
-//         setenv("QUERY_STRING", cgiargs, 1);
+    pid_t pid = fork();
+    if (pid == 0) { /* Child */
+        /* Real server would set all CGI vars here */
+        setenv("QUERY_STRING", cgiargs, 1);
 
-//         /* Redirect stdout to client */
-//         dup2(fd, STDOUT_FILENO);
-//         close(fd);
+        /* Redirect stdout to client */
+        dup2(fd, STDOUT_FILENO);
+        close(fd);
 
-//         /* Run CGI program */
-//         if (execve(filename, emptylist, environ) < 0) {
-//             perror(filename);
-//             exit(1);  /* Exit child process */
-//         }
-//     }
-//     else if (pid == -1) {
-//         perror("fork");
-//         return;
-//     }
+        /* Run CGI program */
+        if (execve(filename, emptylist, environ) < 0) {
+            perror(filename);
+            exit(1);  /* Exit child process */
+        }
+    }
+    else if (pid == -1) {
+        perror("fork");
+        return;
+    }
 
-//     /* Parent waits for and reaps child */
-//     if (wait(NULL) < 0) {
-//         perror("wait");
-//         return;
-//     }
-// }
+    /* Parent waits for and reaps child */
+    if (wait(NULL) < 0) {
+        perror("wait");
+        return;
+    }
+}
 
 /*
  * clienterror - returns an error message to the client
@@ -484,7 +482,7 @@ void serve(client_info *client) {
                         "Tiny couldn't run the CGI program");
             return;
         }
-        serve_dynamic(client->connfd, filename, cgiargs);
+        serve_dynamic_dll(client->connfd, filename, cgiargs);
     }
 }
 
