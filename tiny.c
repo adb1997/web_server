@@ -14,6 +14,8 @@
 #include <stdbool.h>
 #include <unistd.h>
 #include <ctype.h>
+#include <assert.h>
+
 
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -25,6 +27,7 @@
 
 #include <pthread.h>
 #include <dlfcn.h>
+#include "threadpool.h"
 
 
 #define HOSTLEN 256
@@ -463,8 +466,7 @@ void serve(client_info *client) {
 
 
     /* Attempt to stat the file */
-    struct stat sbuf;
-    stat(filename, &sbuf);
+    
 
 
     if (result == PARSE_STATIC) { /* Serve static content */
@@ -473,13 +475,11 @@ void serve(client_info *client) {
         //                 "Tiny couldn't read the file");
         //     return;
         // }
+        struct stat sbuf;
+        stat(filename, &sbuf);
         serve_static(client->connfd, filename, sbuf.st_size);
     } else { /* Serve dynamic content */
-        // if (!(S_ISREG(sbuf.st_mode)) || !(S_IXUSR & sbuf.st_mode)) {
-        //     clienterror(client->connfd, "403", "Forbidden",
-        //                 "Tiny couldn't run the CGI program");
-        //     return;
-        // }
+       //FLIP THIS HERE !!!
         serve_dynamic_dll(client->connfd, filename, cgiargs);
     }
 }
@@ -496,10 +496,24 @@ void *thread(void *vargp){
     return NULL;
 }
 
+int tasks =0, done =0;
+pthread_mutex_t lock;
+
+
+void task(void *vargp){
+    client_info *client = (client_info *)vargp;
+    serve(client);
+    close(client->connfd);
+    free(vargp);
+    pthread_mutex_lock(&lock);
+    done++;
+    pthread_mutex_unlock(&lock);
+}
+
 int main(int argc, char **argv) {
     
     int listenfd;
-    pthread_t tid;
+    // pthread_t tid;
 
     /* Check command line args */
     if (argc != 2) {
@@ -512,6 +526,15 @@ int main(int argc, char **argv) {
         perror("Dlopen");
         return -1;
     }
+
+
+    threadpool_t *pool;
+    pthread_mutex_init(&lock, NULL);
+
+    assert((pool = threadpool_create(32, 256, 0)) != NULL);
+    fprintf(stderr, "Pool started with %d threads and "
+            "queue size of %d\n", 32, 256);
+    
 
 
     listenfd = open_listenfd(argv[1]);
@@ -537,7 +560,17 @@ int main(int argc, char **argv) {
             continue;
         }
 
-        pthread_create(&tid, NULL, thread, client);
+        //pthread_create(&tid, NULL, thread, client);
+
+        if (threadpool_add(pool, &task,client,0) == 0){
+            pthread_mutex_lock(&lock);
+            tasks++;
+            pthread_mutex_unlock(&lock);
+        }
+
+        while((tasks / 2) > done) {
+            usleep(10000);
+        }
         /* Connection is established; serve client */
         // serve(client);
         // close(client->connfd);
