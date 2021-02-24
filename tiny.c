@@ -30,8 +30,12 @@
 #define HOSTLEN 256
 #define SERVLEN 8
 
+
+void *handle;
+
 /* Typedef for convenience */
 typedef struct sockaddr SA;
+
 
 /* Information about a connected client. */
 typedef struct {
@@ -198,7 +202,7 @@ void serve_dynamic(int fd, char *filename, char *cgiargs) {
     size_t buflen;
     //char *emptylist[] = { NULL };
     // cgiargs = NULL;
-    // filename = NULL;
+    filename = NULL;
 
     /* Format first part of HTTP response */
     buflen = snprintf(buf, MAXLINE,
@@ -222,23 +226,20 @@ void serve_dynamic(int fd, char *filename, char *cgiargs) {
         return;
     }
 
-    printf("REACHED HERE ~~\n");
-    printf("Filename: %s\n",filename);
-    printf("Args: %s\n", cgiargs);
+    // int temp = dup(1);
+    // dup2(fd, 1);
 
-
-    int temp = dup(1);
-    dup2(fd, 1);
-
-    void *handle;
-    void (*func)(char *);
+    
+    void (*func)(char *, char *);
+    // void *handle;
     char *error;
+    char buf2 [MAXLINE];
 
-    handle = dlopen("cgi-bin/libvector.so", RTLD_NOW);
-    if (!handle){
-        perror("Dlopen");
-        return;
-    }
+    // handle = dlopen("cgi-bin/libvector.so", RTLD_LAZY);
+    // if (!handle){
+    //     perror("Dlopen");
+    //     return;
+    // }
      
     func = dlsym(handle, "adder");
     if ((error = dlerror()) != NULL){
@@ -247,15 +248,21 @@ void serve_dynamic(int fd, char *filename, char *cgiargs) {
     }
     
 
-    func(cgiargs);
+    func(cgiargs, buf2);
 
-    // if (dlclose(handle) < 0){
-    //     perror("dlclose");
-    //     return;
-    // }
+    if (dlclose(handle) < 0){
+        perror("dlclose");
+        return;
+    }
+    
+    if (rio_writen(fd, buf2, sizeof(buf2)) < 0) {
+        fprintf(stderr, "Error writing static response headers to client\n");
+        return;
+    }
+
     close(fd);
-    dup2(temp, 1);
-    printf("Done\n");
+    // dup2(temp, 1);
+    // printf("Done\n");
 }
 
 /*
@@ -503,6 +510,13 @@ int main(int argc, char **argv) {
         fprintf(stderr, "usage: %s <port>\n", argv[0]);
         exit(1);
     }
+
+    handle = dlopen("cgi-bin/libvector.so", RTLD_LAZY);
+    if (!handle){
+        perror("Dlopen");
+        return -1;
+    }
+
 
     listenfd = open_listenfd(argv[1]);
     if (listenfd < 0) {

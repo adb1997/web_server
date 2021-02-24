@@ -8,7 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-void adder(char *cgi_args) {
+void adder(char *cgi_args, char *buf) {
     // char *buf, *p;
     char content[MAXLINE];
     int n1 = 0; 
@@ -31,12 +31,24 @@ void adder(char *cgi_args) {
         "The answer is: %d + %d = %d\r\n<p>"
         "Thanks for visiting!\r\n",n1, n2, n1+n2);
 
-    /* Generate the HTTP response */
-    printf("Connection: close\r\n");
-    printf("Content-length: %zu\r\n", strlen(content));
-    printf("Content-type: text/html\r\n");
-    printf("\r\n");
-    printf("%s", content);
+    // if (rio_writen(fd, content, ) < 0) {
+    //     fprintf(stderr, "Error writing static response headers to client\n");
+    //     return;
+    // }
+    snprintf(buf, MAXLINE, "Connection: close\r\n"
+        "Content-length: %zu\r\n"
+        "Content-type: text/html\r\n"
+        "\r\n"
+        "%s", strlen(content),  content
+         );
+
+
+    // /* Generate the HTTP response */
+    // printf("Connection: close\r\n");
+    // printf("Content-length: %zu\r\n", strlen(content));
+    // printf("Content-type: text/html\r\n");
+    // printf("\r\n");
+    // printf("%s", content);
     // fflush(stdout);
 
     // exit(0);

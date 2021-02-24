@@ -26,7 +26,7 @@ int main(void) {
     /* Make the response body */
     snprintf(content, sizeof(content),
         "Welcome to add.com: "
-        "THE Internet addition portal.\r\n<p>"
+        "The slow Internet addition portal using FoRKs.\r\n<p>"
         "The answer is: %d + %d = %d\r\n<p>"
         "Thanks for visiting!\r\n",
         n1, n2, n1 + n2);
