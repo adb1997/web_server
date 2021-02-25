@@ -28,7 +28,7 @@
 #include <pthread.h>
 #include <dlfcn.h>
 #include "threadpool.h"
-
+#include "thpool.h"
 
 #define HOSTLEN 256
 #define SERVLEN 8
@@ -231,6 +231,7 @@ void serve_dynamic_dll(int fd, char *filename, char *cgiargs) {
 
     char *ptr = strtok(filename, delim);
     char *last;
+    last = NULL;
 
     while(ptr != NULL)
     {
@@ -487,17 +488,16 @@ void serve(client_info *client) {
 void *thread(void *vargp){
 
     client_info *client = (client_info *)vargp;
-    printf("Created thread for conn: %s:%s", client->host, client->serv);
+    // printf("Created thread for conn: %s:%s", client->host, client->serv);
     pthread_detach(pthread_self());
     serve(client);
-   
     close(client->connfd);
     free(vargp);
     return NULL;
 }
 
-int tasks =0, done =0;
-pthread_mutex_t lock;
+
+// pthread_mutex_t lock;
 
 
 void task(void *vargp){
@@ -505,9 +505,9 @@ void task(void *vargp){
     serve(client);
     close(client->connfd);
     free(vargp);
-    pthread_mutex_lock(&lock);
-    done++;
-    pthread_mutex_unlock(&lock);
+    // pthread_mutex_lock(&lock);
+    // done++;
+    // pthread_mutex_unlock(&lock);
 }
 
 int main(int argc, char **argv) {
@@ -528,14 +528,10 @@ int main(int argc, char **argv) {
     }
 
 
-    threadpool_t *pool;
-    pthread_mutex_init(&lock, NULL);
-
-    assert((pool = threadpool_create(32, 256, 0)) != NULL);
-    fprintf(stderr, "Pool started with %d threads and "
-            "queue size of %d\n", 32, 256);
     
-
+    // pthread_mutex_init(&lock, NULL);
+    
+    threadpool thpool = thpool_init(10);
 
     listenfd = open_listenfd(argv[1]);
     if (listenfd < 0) {
@@ -560,17 +556,19 @@ int main(int argc, char **argv) {
             continue;
         }
 
-        //pthread_create(&tid, NULL, thread, client);
+        thpool_add_work(thpool, task, client);
+        // pthread_create(&tid, NULL, thread, client);
 
-        if (threadpool_add(pool, &task,client,0) == 0){
-            pthread_mutex_lock(&lock);
-            tasks++;
-            pthread_mutex_unlock(&lock);
-        }
+        // if (threadpool_add(pool, &task,client,0) == 0){
+            // pthread_mutex_lock(&lock);
+            // tasks++;
+            // pthread_mutex_unlock(&lock);
+        // }
 
-        while((tasks / 2) > done) {
-            usleep(10000);
-        }
+        // while((tasks / 2) > done) {
+        //     usleep(10000);
+        // }
+
         /* Connection is established; serve client */
         // serve(client);
         // close(client->connfd);

@@ -10,7 +10,7 @@ FILES = tiny tiny-static
 
 all: $(FILES)
 
-tiny: tiny.c threadpool.o csapp.o
+tiny: tiny.c thpool.o csapp.o
 tiny-static: tiny-static.c csapp.o
 cgi-bin/adder: cgi-bin/adder.c
 cgi-bin/goodbye: cgi-bin/goodbye.c

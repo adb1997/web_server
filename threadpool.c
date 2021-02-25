@@ -122,7 +122,7 @@ threadpool_t *threadpool_create(int thread_count, int queue_size, int flags)
     if(thread_count <= 0 || thread_count > MAX_THREADS || queue_size <= 0 || queue_size > MAX_QUEUE) {
         return NULL;
     }
-    flags = 0;
+    (void)flags;
     threadpool_t *pool;
     int i;
 
@@ -178,7 +178,7 @@ int threadpool_add(threadpool_t *pool, void (*function)(void *),
 {
     int err = 0;
     int next;
-    flags =0;
+    (void)flags;
 
     if(pool == NULL || function == NULL) {
         return threadpool_invalid;
